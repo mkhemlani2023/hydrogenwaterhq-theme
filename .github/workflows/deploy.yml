@@ -1,0 +1,43 @@
+name: Deploy to SiteGround
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy WordPress Theme via SSH
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/siteground_key
+          chmod 600 ~/.ssh/siteground_key
+          ssh-keyscan -p 18765 ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy via rsync over SSH
+        run: |
+          rsync -avz --delete \
+            --exclude '.git*' \
+            --exclude 'node_modules' \
+            --exclude '.github' \
+            --exclude 'README.md' \
+            --exclude '.DS_Store' \
+            -e "ssh -i ~/.ssh/siteground_key -p 18765 -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:${{ secrets.THEME_PATH }}
+
+      - name: Cleanup
+        run: rm -f ~/.ssh/siteground_key
+
+      - name: Deployment Complete
+        run: |
+          echo "✅ Theme deployed successfully to SiteGround!"
+          echo "Theme: hydrogenwaterhq"
+          echo "Time: $(date)"
